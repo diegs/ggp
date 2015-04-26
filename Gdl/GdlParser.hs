@@ -9,16 +9,19 @@
 module Gdl.GdlParser where
 
 import Control.Applicative
-
 import Text.Parsec hiding (optional, many, (<|>))
 import Text.Parsec.String
+
+
+sexprFile :: Parser [[String]]
+sexprFile = sep *> many (sexpr (sepBy symbol sep))
 
 -- Lexing.
 comment :: Parser ()
 comment = () <$ (char ';' *> manyTill anyChar endOfLine)
 
 sep :: Parser ()
-sep = () <$ many (comment <|> (space *> (pure ())))
+sep = () <$ many (comment <|> (space *> pure ()))
 
 openParens :: Parser ()
 openParens = char '(' *> sep
@@ -35,19 +38,12 @@ symbol = many1 alphaNum
 variable :: Parser String
 variable = (:) <$> char '?' <*> symbol
 
-sexprFile :: Parser [[String]]
-sexprFile = sep *> (many $ sexpr $ (sepBy symbol sep))
-
 -- Parsing.
-
-data Prop = Prop [String] deriving Show
-
+data Prop = PRelation Relation
+          | PProp [String] deriving Show  --TODO: make this Prop
 data Role = Role String deriving Show
-
 data Action = Action String deriving Show
-
-data Utility = Utility Int deriving Show
-
+data Utility = Utility String deriving Show  --TODO: make this Int
 data Relation = RRole Role
               | RBase Prop
               | RInput Role Action
@@ -61,11 +57,23 @@ data Relation = RRole Role
               deriving Show
 
 -- TODO: fix this definition.
-prop :: Parser Prop
-prop = Prop <$> sexpr (sepBy symbol sep)
-
 rel :: String -> Parser a -> Parser a
-rel tok inner = sexpr $ string tok *> sep *> inner <* sep
+rel tok inner = try $ sexpr $ string tok *> sep *> inner <* sep
+
+prop :: Parser Prop
+prop = (PRelation <$> prelation) <|> (PProp <$> sexpr (sepBy symbol sep))
+
+prelation :: Parser Relation
+prelation = role
+        <|> base
+        <|> input
+        <|> rinit
+        <|> true
+        <|> next
+        <|> does
+        <|> legal
+        <|> goal
+        <|> terminal
 
 role :: Parser Relation
 role = rel "role" ((RRole . Role) <$> symbol)
@@ -75,10 +83,10 @@ base = rel "base" (RBase <$> prop)
 
 input :: Parser Relation
 input = rel "input" input'
-  where input' = (RInput <$> (Role <$> symbol <* sep) <*> (Action <$> symbol))
+  where input' = RInput <$> (Role <$> symbol <* sep) <*> (Action <$> symbol)
 
-init :: Parser Relation
-init = rel "init" (RInit <$> prop)
+rinit :: Parser Relation
+rinit = rel "init" (RInit <$> prop)
 
 true :: Parser Relation
 true = rel "true" (RTrue <$> prop)
@@ -86,4 +94,20 @@ true = rel "true" (RTrue <$> prop)
 next :: Parser Relation
 next = rel "next" (RNext <$> prop)
 
+does :: Parser Relation
+does = rel "does" (RDoes <$> prop)
+
+legal :: Parser Relation
+legal = rel "legal" legal'
+  where legal' = RLegal <$> (Role <$> symbol <* sep) <*> (Action <$> symbol)
+
+goal :: Parser Relation
+goal = rel "goal" goal'
+  where goal' = RGoal <$> (Role <$> symbol <* sep) <*> (Utility <$> symbol)
+
+terminal :: Parser Relation
+terminal = string "terminal" *> sep *> pure RTerminal
+
+prod :: Parser [Prop]
+prod = sexpr $ string "<=" *> sep *> many prop <* sep
 
