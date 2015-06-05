@@ -17,14 +17,11 @@ import Text.Parsec.String
 -- Sexpr parser: lexes raw input into recursive lists of symbols.
 data SExpr a = Symbol a
              | SExpr [SExpr a]
+             deriving Show
 
+-- Parses arbitrary sexprs, discarding preceding comments/whitespace.
 sexprs :: Parser [SExpr String]
 sexprs = sep *> many sexpr
-
--- A separator is any amount of whitespace and/or comments.
-sep :: Parser ()
-sep = () <$ many (comment <|> (space *> pure ()))
-  where comment = () <$ (char ';' *> manyTill anyChar endOfLine)
 
 -- A sexpr is any number of sexprs and alphanumeric tokens enclosed by parens and
 -- separated by separators.
@@ -35,7 +32,15 @@ sexpr = SExpr <$> (between openParens closeParens $ sepBy sexpr' sep)
         openParens = char '(' *> sep
         closeParens = char ')' *> sep
 
+-- A separator is any amount of whitespace and/or comments.
+sep :: Parser [Char]
+sep = many (comment <|> space)
+  where comment = char ';' <* manyTill anyChar eoComment
+        eoComment = (endOfLine *> pure ()) <|> eof
+
 -- Relation parser: parses sexprs into relations.
+data Relation
+data Entity
 
 -- Game parser: turns relations into valid game definitions.
 
