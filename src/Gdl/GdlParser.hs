@@ -29,8 +29,8 @@ sep = () <$ many (comment <|> (space *> pure ()))
 -- A sexpr is any number of sexprs and alphanumeric tokens enclosed by parens and
 -- separated by separators.
 sexpr :: Parser (SExpr String)
-sexpr = SExpr <$> (between openParens closeParens $ sepBy sexpr' sep)
-  where sexpr' = sexpr <|> (symbol <* sep)
+sexpr = SExpr <$> (between openParens closeParens $ sepBy sexprOrSym sep)
+  where sexprOrSym = sexpr <|> (symbol <* sep)
         symbol = Symbol <$> many1 alphaNum
         openParens = char '(' *> sep
         closeParens = char ')' *> sep
